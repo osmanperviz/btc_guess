@@ -14,6 +14,8 @@ defmodule BtcGuess.Application do
       {Phoenix.PubSub, name: BtcGuess.PubSub},
       # Start a worker by calling: BtcGuess.Worker.start_link(arg)
       # {BtcGuess.Worker, arg},
+      {Finch, name: BtcGuessFinch},
+      BtcGuess.Price.Cache,
       # Start to serve requests, typically the last entry
       BtcGuessWeb.Endpoint,
       {Oban, Application.fetch_env!(:btc_guess, Oban)}
