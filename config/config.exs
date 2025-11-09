@@ -54,7 +54,7 @@ config :phoenix, :json_library, Jason
 config :btc_guess, Oban,
   repo: BtcGuess.Repo,
   queues: [eligibility: 10, resolution: 50],
-  plugins: [Oban.Plugins.Stager, Oban.Plugins.Pruner]
+  plugins: [Oban.Plugins.Pruner]
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
