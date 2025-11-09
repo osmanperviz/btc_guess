@@ -15,7 +15,8 @@ defmodule BtcGuess.Application do
       # Start a worker by calling: BtcGuess.Worker.start_link(arg)
       # {BtcGuess.Worker, arg},
       # Start to serve requests, typically the last entry
-      BtcGuessWeb.Endpoint
+      BtcGuessWeb.Endpoint,
+      {Oban, Application.fetch_env!(:btc_guess, Oban)}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
