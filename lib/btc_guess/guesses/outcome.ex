@@ -8,16 +8,16 @@ defmodule BtcGuess.Guesses.Outcome do
 
   ## Logic
 
-    * If `resolve_price` > `entry_price` and the player guessed `"up"`, it's a win.
-    * If `resolve_price` < `entry_price` and the player guessed `"down"`, it's a win.
+    * If `resolve_price` > `entry_price` and the player guessed `:up`, it's a win.
+    * If `resolve_price` < `entry_price` and the player guessed `:down`, it's a win.
     * If prices are equal, or the direction was wrong, it's a loss.
 
   The module exposes a simple function:
 
-      iex> Outcome.evaluate("up", Decimal.new("64000.00"), Decimal.new("64010.00"))
+      iex> Outcome.evaluate(:up, Decimal.new("64000.00"), Decimal.new("64010.00"))
       :win
 
-      iex> Outcome.evaluate("down", Decimal.new("64000.00"), Decimal.new("64010.00"))
+      iex> Outcome.evaluate(:down, Decimal.new("64000.00"), Decimal.new("64010.00"))
       :lose
 
   This logic is used by the background job that resolves guesses.
@@ -25,8 +25,8 @@ defmodule BtcGuess.Guesses.Outcome do
   def evaluate(direction, entry, now_price) do
     cond do
       Decimal.eq?(now_price, entry) -> :no_change
-      direction == "up" and Decimal.gt?(now_price, entry) -> :win
-      direction == "down" and Decimal.lt?(now_price, entry) -> :win
+      direction == :up and Decimal.gt?(now_price, entry) -> :win
+      direction == :down and Decimal.lt?(now_price, entry) -> :win
       true -> :lose
     end
   end

@@ -62,6 +62,7 @@ defmodule BtcGuess.MixProject do
       {:oban, "~> 2.17"},
       {:finch, "~> 0.18"},
       {:decimal, "~> 2.1"},
+      {:websockex, "~> 0.4"},
       {:mox, "~> 1.1", only: :test}
     ]
   end

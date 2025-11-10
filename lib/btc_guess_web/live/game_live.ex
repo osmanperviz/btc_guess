@@ -9,7 +9,9 @@ defmodule BtcGuessWeb.GameLive do
     player_id = session["user_id"]
     player = Guesses.ensure_player!(player_id)
 
+    # Subscribe to player-specific events and price updates
     Phoenix.PubSub.subscribe(BtcGuess.PubSub, "player:" <> player_id)
+    Phoenix.PubSub.subscribe(BtcGuess.PubSub, "price:ticker")
 
     open = Guesses.open_guess_for(player_id)
     history = Guesses.last_guesses(player_id)
@@ -19,12 +21,18 @@ defmodule BtcGuessWeb.GameLive do
       schedule_tick()
     end
 
+    latest_price =
+      case BtcGuess.Price.latest() do
+        {:ok, %{price: p}} -> p
+        _ -> nil
+      end
+
     {:ok,
      socket
      |> assign(:player, player)
      |> assign(:open_guess, open)
      |> assign(:history, history)
-     |> assign(:latest_price, latest_price())
+     |> assign(:latest_price, latest_price)
      |> assign(:current_time, DateTime.utc_now())}
   end
 
@@ -118,10 +126,10 @@ defmodule BtcGuessWeb.GameLive do
                   <div class="flex items-center gap-2 mb-1">
                     <span class={[
                       "font-bold text-lg",
-                      g.outcome == "win" && "text-green-600",
-                      g.outcome == "lose" && "text-red-600"
+                      g.outcome == :win && "text-green-600",
+                      g.outcome == :lose && "text-red-600"
                     ]}>
-                      {if g.outcome == "win", do: "✅ WIN", else: "❌ LOSE"}
+                      {if g.outcome == :win, do: "✅ WIN", else: "❌ LOSE"}
                     </span>
                     <span class="text-sm text-gray-500">{format_time(g.inserted_at)}</span>
                   </div>
@@ -138,13 +146,6 @@ defmodule BtcGuessWeb.GameLive do
       </div>
     </div>
     """
-  end
-
-  defp latest_price() do
-    case BtcGuess.Price.latest() do
-      {:ok, %{price: p}} -> p
-      _ -> nil
-    end
   end
 
   defp format_price(nil), do: "..."
@@ -196,6 +197,11 @@ defmodule BtcGuessWeb.GameLive do
           {:noreply, put_flash(socket, :error, "Failed to place guess: #{Exception.message(e)}")}
       end
     end
+  end
+
+  @impl true
+  def handle_info({:price, %{price: price}}, socket) do
+    {:noreply, assign(socket, :latest_price, price)}
   end
 
   @impl true

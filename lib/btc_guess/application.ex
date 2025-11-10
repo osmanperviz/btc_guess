@@ -16,6 +16,7 @@ defmodule BtcGuess.Application do
       # {BtcGuess.Worker, arg},
       {Finch, name: BtcGuessFinch},
       BtcGuess.Price.Cache,
+      BtcGuess.Price.Streamer,
       # Start to serve requests, typically the last entry
       BtcGuessWeb.Endpoint,
       {Oban, Application.fetch_env!(:btc_guess, Oban)}
