@@ -39,56 +39,80 @@ defmodule BtcGuess.Guesses.Jobs.GuessEligibilityJob do
   import Ecto.Query
   alias BtcGuess.{Repo}
   alias BtcGuess.Guesses.Guess
+  alias BtcGuess.Guesses.Outcome
+  alias BtcGuess.Guesses.Jobs.ResolveGuessJob
 
   @impl true
   def perform(%Oban.Job{args: %{"guess_id" => id}}) do
-    Repo.transaction(fn ->
-      guess =
-        Repo.one!(from g in Guess, where: g.id == ^id, lock: "FOR UPDATE")
+    result =
+      Repo.transaction(fn ->
+        # Lock the guess row once
+        guess =
+          Repo.one!(from g in Guess, where: g.id == ^id, lock: "FOR UPDATE")
 
-      if guess.resolved do
-        :noop
-      else
-        with {:ok, %{price: price, source: src, received_at: received_at}} <-
-               BtcGuess.Price.latest_after(guess.eligibility_ts),
-             outcome when outcome != :no_change <-
-               BtcGuess.Guesses.Outcome.evaluate(guess.direction, guess.entry_price, price) do
-          resolve(guess, outcome, price, received_at, src)
+        cond do
+          guess.resolved ->
+            {:noop, nil}
 
-          {:resolved, %{guess_id: guess.id, player_id: guess.player_id}}
-        else
-          :no_change -> :no_change
-          {:error, _} -> :retry_later
+          DateTime.compare(DateTime.utc_now(), guess.eligibility_ts) == :lt ->
+            # Fired early? reschedule for the exact eligibility moment
+            Oban.insert!(new(%{"guess_id" => id}, scheduled_at: guess.eligibility_ts))
+            {:noop, nil}
+
+          true ->
+            case BtcGuess.Price.latest_after(guess.eligibility_ts) do
+              {:ok, %{price: price, source: source, received_at: received_at}} ->
+                case Outcome.evaluate(guess.direction, guess.entry_price, price) do
+                  :no_change ->
+                    # Hand over to the retrying resolver job
+                    Oban.insert!(
+                      ResolveGuessJob.new(%{"guess_id" => id},
+                        scheduled_at: DateTime.add(DateTime.utc_now(), 2, :second)
+                      )
+                    )
+
+                    {:noop, nil}
+
+                  out ->
+                    inc = if out == :win, do: 1, else: -1
+
+                    guess
+                    |> Ecto.Changeset.change(%{
+                      resolved: true,
+                      resolve_price: price,
+                      resolve_ts: received_at,
+                      source: source,
+                      outcome: Atom.to_string(out)
+                    })
+                    |> Repo.update!()
+
+                    Repo.query!("UPDATE players SET score = score + $1 WHERE id = $2", [
+                      inc,
+                      guess.player_id
+                    ])
+
+                    {:resolved, %{player_id: guess.player_id, guess_id: guess.id}}
+                end
+
+              {:error, _} ->
+                Oban.insert!(
+                  ResolveGuessJob.new(%{"guess_id" => id},
+                    scheduled_at: DateTime.add(DateTime.utc_now(), 2, :second)
+                  )
+                )
+
+                {:noop, nil}
+            end
         end
-      end
-    end)
-    |> case do
-      {:ok, {:resolved, %{guess_id: gid, player_id: pid}}} ->
+      end)
+
+    case result do
+      {:ok, {:resolved, %{player_id: pid, guess_id: gid}}} ->
         Phoenix.PubSub.broadcast(BtcGuess.PubSub, "player:" <> pid, {:guess_resolved, gid})
         :ok
 
       _ ->
         :ok
     end
-  end
-
-  defp resolve(guess, outcome, price, ts, src) do
-    inc = if outcome == :win, do: 1, else: -1
-
-    guess
-    |> Ecto.Changeset.change(%{
-      resolved: true,
-      resolve_price: price,
-      resolve_ts: ts,
-      source: src,
-      outcome: Atom.to_string(outcome)
-    })
-    |> Repo.update!()
-
-    # Using raw SQL here is intentional for atomic score updates to prevent race conditions.
-    Repo.query!("UPDATE players SET score = score + $1 WHERE id = $2", [
-      inc,
-      guess.player_id
-    ])
   end
 end
