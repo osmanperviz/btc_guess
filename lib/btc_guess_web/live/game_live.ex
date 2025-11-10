@@ -3,7 +3,6 @@ defmodule BtcGuessWeb.GameLive do
 
   alias BtcGuess.Guesses
   alias BtcGuess.Repo
-  import Ecto.Query
 
   @impl true
   def mount(_params, session, socket) do
@@ -37,7 +36,7 @@ defmodule BtcGuessWeb.GameLive do
         <!-- Header Card -->
         <div class="bg-white rounded-2xl shadow-xl p-8 mb-6">
           <h1 class="text-4xl font-bold text-center text-gray-800 mb-6">🪙 BTC Price Guess</h1>
-          
+
           <div class="grid grid-cols-2 gap-4 mb-6">
             <div class="bg-blue-50 rounded-xl p-4 text-center">
               <p class="text-sm text-gray-600 mb-1">Current Price</p>
@@ -76,7 +75,7 @@ defmodule BtcGuessWeb.GameLive do
               <h3 class="text-2xl font-bold text-yellow-900">GUESS IN PROGRESS</h3>
               <span class="text-4xl">⏳</span>
             </div>
-            
+
             <div class="bg-white/80 rounded-xl p-4 mb-4">
               <div class="grid grid-cols-2 gap-4 text-center">
                 <div>
@@ -107,7 +106,7 @@ defmodule BtcGuessWeb.GameLive do
         <!-- History Card -->
         <div class="bg-white rounded-2xl shadow-xl p-8">
           <h2 class="text-2xl font-bold text-gray-800 mb-4">📊 Recent Rounds</h2>
-          
+
           <div :if={@history == []} class="text-center text-gray-500 py-8">
             No rounds yet. Make your first guess!
           </div>
@@ -149,6 +148,7 @@ defmodule BtcGuessWeb.GameLive do
   end
 
   defp format_price(nil), do: "..."
+
   defp format_price(price) when is_struct(price, Decimal) do
     price
     |> Decimal.round(2)
@@ -157,19 +157,20 @@ defmodule BtcGuessWeb.GameLive do
   end
 
   defp format_time(nil), do: ""
+
   defp format_time(datetime) do
     Calendar.strftime(datetime, "%b %d, %H:%M:%S")
   end
 
   defp get_status_message(eligibility_ts, current_time) do
     diff = DateTime.diff(eligibility_ts, current_time)
-    
+
     cond do
       diff > 0 ->
         minutes = div(diff, 60)
         seconds = rem(diff, 60)
         "Resolves in #{minutes}m #{seconds}s"
-      
+
       true ->
         "Waiting for price to change..."
     end
@@ -179,7 +180,7 @@ defmodule BtcGuessWeb.GameLive do
   def handle_event("guess", %{"dir" => dir}, socket) do
     require Logger
     Logger.info("Guess button clicked: #{dir}")
-    
+
     if socket.assigns.open_guess do
       {:noreply, socket}
     else
@@ -201,12 +202,12 @@ defmodule BtcGuessWeb.GameLive do
   def handle_info(:tick, socket) do
     # Update current time for countdown
     socket = assign(socket, :current_time, DateTime.utc_now())
-    
+
     # Keep ticking if there's still an open guess
     if socket.assigns.open_guess do
       schedule_tick()
     end
-    
+
     {:noreply, socket}
   end
 
@@ -214,15 +215,17 @@ defmodule BtcGuessWeb.GameLive do
   def handle_info({:guess_resolved, guess_id}, socket) do
     require Logger
     Logger.info("Received guess_resolved for #{guess_id}")
-    
+
     player_id = socket.assigns.player.id
-    
+
     # Reload all data from database
     player = Repo.get!(BtcGuess.Players.Player, player_id)
     open = Guesses.open_guess_for(player_id)
     history = Guesses.last_guesses(player_id)
-    
-    Logger.info("Player score: #{player.score}, Open guess: #{inspect(open)}, History count: #{length(history)}")
+
+    Logger.info(
+      "Player score: #{player.score}, Open guess: #{inspect(open)}, History count: #{length(history)}"
+    )
 
     {:noreply,
      socket

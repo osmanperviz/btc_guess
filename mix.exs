@@ -61,7 +61,8 @@ defmodule BtcGuess.MixProject do
       {:bandit, "~> 1.5"},
       {:oban, "~> 2.17"},
       {:finch, "~> 0.18"},
-      {:decimal, "~> 2.1"}
+      {:decimal, "~> 2.1"},
+      {:mox, "~> 1.1", only: :test}
     ]
   end
 

@@ -14,7 +14,6 @@ defmodule BtcGuess.Guesses.Jobs.ResolveGuessJob do
   def perform(%Oban.Job{args: %{"guess_id" => id}, attempt: attempt}) do
     result =
       Repo.transaction(fn ->
-        # 1) Lock the guess row
         guess =
           Repo.one!(from g in Guess, where: g.id == ^id, lock: "FOR UPDATE")
 
@@ -22,7 +21,6 @@ defmodule BtcGuess.Guesses.Jobs.ResolveGuessJob do
           guess.resolved ->
             {:noop, nil}
 
-          # If somehow we were scheduled before eligibility, bounce us to eligibility time.
           DateTime.compare(DateTime.utc_now(), guess.eligibility_ts) == :lt ->
             {:reschedule_at, guess.eligibility_ts}
 
@@ -70,14 +68,12 @@ defmodule BtcGuess.Guesses.Jobs.ResolveGuessJob do
               resolve_price: price,
               resolve_ts: received_at,
               source: source,
-              outcome: Atom.to_string(out)
+              outcome: out
             })
             |> Repo.update!()
 
-            Repo.query!("UPDATE players SET score = score + $1 WHERE id = $2", [
-              inc,
-              guess.player_id
-            ])
+            from(p in BtcGuess.Players.Player, where: p.id == ^guess.player_id)
+            |> Repo.update_all(inc: [score: inc])
 
             {:resolved, %{player_id: guess.player_id, guess_id: guess.id}}
         end

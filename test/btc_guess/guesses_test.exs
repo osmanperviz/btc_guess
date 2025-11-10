@@ -2,7 +2,6 @@ defmodule BtcGuess.GuessesTest do
   use BtcGuess.DataCase, async: true
 
   alias BtcGuess.Guesses
-  alias BtcGuess.Guesses.Guess
   alias BtcGuess.Players.Player
 
   describe "place_guess!/2" do
