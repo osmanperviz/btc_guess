@@ -1,5 +1,16 @@
 defmodule BtcGuessWeb.Router do
   use BtcGuessWeb, :router
+  import Phoenix.LiveView.Router
+
+  pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {BtcGuessWeb.Layouts, :root}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+    plug BtcGuessWeb.UserIdPlug
+  end
 
   pipeline :api do
     plug :accepts, ["json"]
@@ -7,6 +18,12 @@ defmodule BtcGuessWeb.Router do
 
   scope "/api", BtcGuessWeb do
     pipe_through :api
+  end
+
+  scope "/", BtcGuessWeb do
+    pipe_through :browser
+
+    live "/", GameLive
   end
 
   # Enable LiveDashboard in development

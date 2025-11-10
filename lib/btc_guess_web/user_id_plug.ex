@@ -7,7 +7,7 @@ defmodule BtcGuessWeb.UserIdPlug do
   def init(opts), do: opts
 
   def call(conn, _opts) do
-    conn = fetch_cookies(conn)
+    conn = conn |> fetch_cookies() |> fetch_session()
 
     case conn.cookies[@cookie] do
       nil ->
@@ -15,10 +15,13 @@ defmodule BtcGuessWeb.UserIdPlug do
 
         conn
         |> put_resp_cookie(@cookie, user_id, http_only: true, max_age: @max_age)
+        |> put_session("user_id", user_id)
         |> assign(:user_id, user_id)
 
       user_id ->
-        assign(conn, :user_id, user_id)
+        conn
+        |> put_session("user_id", user_id)
+        |> assign(:user_id, user_id)
     end
   end
 end

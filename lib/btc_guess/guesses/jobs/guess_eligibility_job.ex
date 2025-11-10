@@ -41,29 +41,46 @@ defmodule BtcGuess.Guesses.Jobs.GuessEligibilityJob do
   alias BtcGuess.Guesses.Guess
   alias BtcGuess.Guesses.Outcome
   alias BtcGuess.Guesses.Jobs.ResolveGuessJob
+  alias BtcGuess.Players.Player
+
+  require Logger
 
   @impl true
   def perform(%Oban.Job{args: %{"guess_id" => id}}) do
+    require Logger
+    Logger.info("GuessEligibilityJob starting for guess #{id}")
+
     result =
       Repo.transaction(fn ->
         # Lock the guess row once
         guess =
           Repo.one!(from g in Guess, where: g.id == ^id, lock: "FOR UPDATE")
 
+        Logger.info(
+          "Guess loaded: resolved=#{guess.resolved}, eligibility_ts=#{guess.eligibility_ts}, now=#{DateTime.utc_now()}"
+        )
+
         cond do
           guess.resolved ->
+            Logger.info("Guess already resolved, skipping")
             {:noop, nil}
 
-          DateTime.compare(DateTime.utc_now(), guess.eligibility_ts) == :lt ->
+          DateTime.diff(guess.eligibility_ts, DateTime.utc_now()) > 1 ->
             # Fired early? reschedule for the exact eligibility moment
+            Logger.info("Job fired too early, rescheduling for #{guess.eligibility_ts}")
             Oban.insert!(new(%{"guess_id" => id}, scheduled_at: guess.eligibility_ts))
             {:noop, nil}
 
           true ->
+            Logger.info("Attempting to resolve guess...")
+
             case BtcGuess.Price.latest_after(guess.eligibility_ts) do
               {:ok, %{price: price, source: source, received_at: received_at}} ->
+                Logger.info("Got price: #{price}, evaluating outcome...")
+
                 case Outcome.evaluate(guess.direction, guess.entry_price, price) do
                   :no_change ->
+                    Logger.info("Price unchanged, scheduling ResolveGuessJob")
                     # Hand over to the retrying resolver job
                     Oban.insert!(
                       ResolveGuessJob.new(%{"guess_id" => id},
@@ -74,6 +91,7 @@ defmodule BtcGuess.Guesses.Jobs.GuessEligibilityJob do
                     {:noop, nil}
 
                   out ->
+                    Logger.info("Outcome: #{out}, resolving guess...")
                     inc = if out == :win, do: 1, else: -1
 
                     guess
@@ -82,19 +100,21 @@ defmodule BtcGuess.Guesses.Jobs.GuessEligibilityJob do
                       resolve_price: price,
                       resolve_ts: received_at,
                       source: source,
-                      outcome: Atom.to_string(out)
+                      outcome: out
                     })
                     |> Repo.update!()
 
-                    Repo.query!("UPDATE players SET score = score + $1 WHERE id = $2", [
-                      inc,
-                      guess.player_id
-                    ])
+                    from(p in Player, where: p.id == ^guess.player_id)
+                    |> Repo.update_all(inc: [score: inc])
 
                     {:resolved, %{player_id: guess.player_id, guess_id: guess.id}}
                 end
 
-              {:error, _} ->
+              {:error, reason} ->
+                Logger.error(
+                  "Failed to get price: #{inspect(reason)}, scheduling ResolveGuessJob"
+                )
+
                 Oban.insert!(
                   ResolveGuessJob.new(%{"guess_id" => id},
                     scheduled_at: DateTime.add(DateTime.utc_now(), 2, :second)
@@ -108,7 +128,10 @@ defmodule BtcGuess.Guesses.Jobs.GuessEligibilityJob do
 
     case result do
       {:ok, {:resolved, %{player_id: pid, guess_id: gid}}} ->
-        Phoenix.PubSub.broadcast(BtcGuess.PubSub, "player:" <> pid, {:guess_resolved, gid})
+        topic = "player:" <> pid
+        Logger.info("Broadcasting guess_resolved for guess #{gid} to topic: #{topic}")
+
+        Phoenix.PubSub.broadcast(BtcGuess.PubSub, topic, {:guess_resolved, gid})
         :ok
 
       _ ->

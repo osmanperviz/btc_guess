@@ -56,6 +56,68 @@ defmodule BtcGuessWeb do
     end
   end
 
+  def live_view do
+    quote do
+      use Phoenix.LiveView,
+        layout: {BtcGuessWeb.Layouts, :app}
+
+      unquote(html_helpers())
+    end
+  end
+
+  def view do
+    quote do
+      use Phoenix.View,
+        root: "lib/btc_guess_web/templates",
+        namespace: BtcGuessWeb
+
+      # Import convenience functions from controllers
+      import Phoenix.Controller, only: [get_flash: 1, get_flash: 2, view_module: 1]
+
+      # Use all HTML functionality (forms, tags, etc)
+      unquote(html_helpers())
+    end
+  end
+
+  def html do
+    quote do
+      use Phoenix.HTML
+
+      import BtcGuessWeb.Gettext
+
+      import BtcGuessWeb.View,
+        only: [assign_new: 3, assign_new: 4, force_assign: 5]
+
+      unquote(html_helpers())
+    end
+  end
+
+  def layout_view do
+    quote do
+      use Phoenix.View,
+        root: "lib/btc_guess_web/templates",
+        namespace: BtcGuessWeb
+
+      import BtcGuessWeb.Gettext
+    end
+  end
+
+  def view_helpers do
+    quote do
+      # Use all HTML functionality (forms, tags, etc)
+      unquote(html_helpers())
+    end
+  end
+
+  def html_helpers do
+    quote do
+      # HTML helpers
+      import Phoenix.HTML
+
+      import BtcGuessWeb.Gettext
+    end
+  end
+
   @doc """
   When used, dispatch to the appropriate controller/live_view/etc.
   """
