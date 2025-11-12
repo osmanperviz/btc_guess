@@ -42,6 +42,8 @@ defmodule BtcGuess.Guesses do
 
     Oban.insert!(GuessEligibilityJob.new(%{"guess_id" => guess.id}, scheduled_at: elig))
 
+    Phoenix.PubSub.broadcast(BtcGuess.PubSub, "player:" <> player_id, {:guess_placed, guess.id})
+
     guess
   end
 end

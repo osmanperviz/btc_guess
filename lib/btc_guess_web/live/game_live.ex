@@ -218,6 +218,22 @@ defmodule BtcGuessWeb.GameLive do
   end
 
   @impl true
+  def handle_info({:guess_placed, guess_id}, socket) do
+    require Logger
+    Logger.info("Received guess_placed for #{guess_id}")
+
+    player_id = socket.assigns.player.id
+
+    open = Guesses.open_guess_for(player_id)
+
+    if open do
+      schedule_tick()
+    end
+
+    {:noreply, assign(socket, open_guess: open)}
+  end
+
+  @impl true
   def handle_info({:guess_resolved, guess_id}, socket) do
     require Logger
     Logger.info("Received guess_resolved for #{guess_id}")
