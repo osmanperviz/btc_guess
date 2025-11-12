@@ -4,6 +4,8 @@ defmodule BtcGuessWeb.GameLive do
   alias BtcGuess.Guesses
   alias BtcGuess.Repo
 
+  require Logger
+
   @impl true
   def mount(_params, session, socket) do
     player_id = session["user_id"]
@@ -219,7 +221,6 @@ defmodule BtcGuessWeb.GameLive do
 
   @impl true
   def handle_info({:guess_placed, guess_id}, socket) do
-    require Logger
     Logger.info("Received guess_placed for #{guess_id}")
 
     player_id = socket.assigns.player.id
@@ -235,7 +236,6 @@ defmodule BtcGuessWeb.GameLive do
 
   @impl true
   def handle_info({:guess_resolved, guess_id}, socket) do
-    require Logger
     Logger.info("Received guess_resolved for #{guess_id}")
 
     player_id = socket.assigns.player.id
